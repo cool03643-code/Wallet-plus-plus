@@ -1,0 +1,24 @@
+# Wallet+ - Cloudflare Pages (GitHub + Supabase + Cloudflare)
+#
+# Pure static frontend.
+# - GitHub: source code + OAuth login
+# - Supabase: authentication + PostgreSQL database (RLS)
+# - Cloudflare Pages: hosting
+#
+# The full app (login with GitHub, Send, Swap, Receive, live prices) runs in the browser
+# using the Supabase JavaScript client. No Python backend needed.
+
+name = "wallet-plus-plus2"
+compatibility_date = "2026-08-24"
+
+[assets]
+directory = "./public"
+
+# Cloudflare Pages Dashboard Settings:
+#   Framework preset:           None
+#   Build command:              (leave completely EMPTY / blank)   <--- Recommended
+#   Build output directory:     public
+#   Root directory:             (leave empty or .)
+#
+# After deploy: edit public/index.html with your real Supabase URL + anon key.
+# Run supabase_schema.sql once in Supabase SQL Editor.
