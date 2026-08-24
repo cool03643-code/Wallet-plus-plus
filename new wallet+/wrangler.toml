@@ -1,20 +1,24 @@
-# Wallet+ - Cloudflare Pages configuration (STATIC FALLBACK ONLY)
+# Wallet+ - Cloudflare Pages (GitHub + Supabase + Cloudflare)
 #
-# IMPORTANT: This is a Python Flask application.
-# Cloudflare Pages can only serve the static files in the 'public' folder.
-# The real backend (login, dashboard, database, Send/Swap) will NOT work.
+# Pure static frontend.
+# - GitHub: source code + OAuth login
+# - Supabase: authentication + PostgreSQL database (RLS)
+# - Cloudflare Pages: hosting
 #
-# For a working version use Render or Railway (see DEPLOYMENT.md).
+# The full app (login with GitHub, Send, Swap, Receive, live prices) runs in the browser
+# using the Supabase JavaScript client. No Python backend needed.
 
-name = "wallet-plus"
-compatibility_date = "2024-01-01"
+name = "wallet-plus-plus2"
+compatibility_date = "2026-08-24"
 
-[site]
-bucket = "./public"
+[assets]
+directory = "./public"
 
-# Recommended Cloudflare Pages settings:
-#   Build command:        npm run build
-#   Build output directory: public
-#   Root directory:         (leave empty or .)
+# Cloudflare Pages Dashboard Settings:
+#   Framework preset:           None
+#   Build command:              (leave completely EMPTY / blank)   <--- Recommended
+#   Build output directory:     public
+#   Root directory:             (leave empty or .)
 #
-# This will only show a placeholder page explaining the limitation.
+# After deploy: edit public/index.html with your real Supabase URL + anon key.
+# Run supabase_schema.sql once in Supabase SQL Editor.
