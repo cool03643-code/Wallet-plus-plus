@@ -1,0 +1,70 @@
+WALLET+ - DEPLOYMENT NEXT STEPS
+=================================
+
+CURRENT STATUS (as of now):
+- Flask app is running locally and healthy (no more sqlite3.Row errors)
+- All deployment files prepared
+- Git is NOT installed on this computer
+
+STEP 1: Install Git (required for GitHub)
+---------------------------------------
+Download and install Git for Windows:
+https://git-scm.com/download/win
+
+After install:
+- Restart VS Code / PowerShell
+- Run the file: PUSH_TO_GITHUB.bat
+
+STEP 2: Push to GitHub
+----------------------
+1. Create a new repository on GitHub (empty, no README).
+2. Run PUSH_TO_GITHUB.bat (it will guide you).
+3. Or manually:
+
+   git init
+   git branch -M main
+   git add .
+   git commit -m "Initial commit"
+   git remote add origin https://github.com/YOUR_USERNAME/wallet-plus.git
+   git push -u origin main
+
+STEP 3: Deploy the REAL app (choose one)
+----------------------------------------
+A. Render (recommended, free tier)
+   - https://render.com
+   - New Web Service → Connect GitHub repo
+   - It will use render.yaml automatically
+
+B. Railway
+   - https://railway.app
+   - Deploy from GitHub repo
+
+C. Keep using temporary public link (no GitHub needed)
+   Open two terminals:
+     python app.py
+     ssh -R 80:localhost:5000 nokey@localhost.run
+
+CLOUDFLARE NOTE
+---------------
+Cloudflare Pages CANNOT run this Python Flask app.
+The files in public/ + wrangler.toml are only a static placeholder.
+If you connect to Cloudflare Pages you will only get a "this is static" page.
+
+For a working public version use Render / Railway, or the localhost.run tunnel.
+
+FILES PREPARED FOR YOU
+----------------------
+- .gitignore
+- render.yaml
+- railway.json + Procfile
+- requirements.txt
+- DEPLOYMENT.md (full guide)
+- PUSH_TO_GITHUB.bat (helper script)
+- public/ folder (for Cloudflare static fallback)
+- wrangler.toml + package.json
+- .github/workflows/cloudflare-pages.yml
+
+The app is currently running on http://127.0.0.1:5000
+Login with: admin@wallet.com / admin123
+
+After you push to GitHub and deploy, tell me the new URL and I can help further.

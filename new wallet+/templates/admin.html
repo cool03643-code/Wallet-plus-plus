@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="min-h-screen bg-zinc-950 text-white">
+    <div class="max-w-7xl mx-auto">
+        <!-- Admin Header -->
+        <div class="bg-black border-b border-red-500/30 p-6 sticky top-0 z-50">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="px-4 py-2 bg-red-500/10 text-red-400 rounded-2xl text-sm font-mono flex items-center gap-2">
+                        <div class="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        ADMIN MODE - FULL CONTROL
+                    </div>
+                    <h1 class="text-3xl font-bold">Wallet+ Control Center</h1>
+                </div>
+                <div class="flex items-center gap-4">
+                    <a href="{{ url_for('dashboard') }}" class="text-sm px-4 py-2 bg-white/10 rounded-2xl hover:bg-white/20">View as User</a>
+                    <a href="{{ url_for('logout') }}" class="text-red-400 hover:text-red-300 font-medium">Logout Admin</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-6">
+            <div class="mb-8">
+                <h2 class="text-2xl font-semibold mb-2">All Users &amp; Their Wallets</h2>
+                <p class="text-white/50">You have complete control. Changes are instant and visible to users.</p>
+            </div>
+
+            {% for user in users %}
+            <div class="bg-zinc-900 border border-white/10 rounded-3xl p-6 mb-8" id="user-{{ user['id'] }}">
+                <div class="flex flex-wrap justify-between items-start gap-4 mb-6">
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <div class="font-bold text-2xl">{{ user['name'] }}</div>
+                            {% if user['role'] == 'admin' %}
+                            <span class="px-3 py-1 text-xs bg-red-500/20 text-red-400 rounded-full">ADMIN</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-emerald-400">{{ user['email'] }}</div>
+                        <div class="text-xs text-white/40 mt-1">User ID: {{ user['id'] }} • Created: {{ user['created_at'][:10] if user['created_at'] else 'N/A' }}</div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="viewCredentials({{ user['id'] }}, '{{ user['email'] }}', '{{ user['name'] }}')" 
+                                class="px-4 py-2 text-sm bg-white/10 hover:bg-white/20 rounded-2xl">
+                            View Credentials
+                        </button>
+                        <button onclick="loadUserDetails({{ user['id'] }})" 
+                                class="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 rounded-2xl">
+                            Refresh Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Verification Status -->
+                <div class="mb-4 p-4 bg-zinc-950 border border-white/10 rounded-2xl">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            {% if user.verification.is_verified %}
+                                <button onclick="openVerificationModal({{ user['id'] }}, '{{ user['name'] }}', true, {{ user.verification.steps|tojson }})"
+                                        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl text-sm font-medium bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30">
+                                    <i class="fa-solid fa-check-circle"></i>
+                                    <span>Account Verified</span>
+                                </button>
+                            {% else %}
+                                <button onclick="openVerificationModal({{ user['id'] }}, '{{ user['name'] }}', false, {{ user.verification.steps|tojson }})"
+                                        class="inline-flex items-center gap-2 px-4 py-1.5 rounded-2xl text-sm font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 border border-red-500/30">
+                                    <i class="fa-solid fa-exclamation-triangle"></i>
+                                    <span>Account Unverified</span>
+                                </button>
+                            {% endif %}
+                            <span class="text-xs text-white/40">
+                                {% if user.verification.steps|length > 0 %}{{ user.verification.steps|length }} step(s){% endif %}
+                            </span>
+                        </div>
+                        <button onclick="openVerificationModal({{ user['id'] }}, '{{ user['name'] }}', {{ user.verification.is_verified|tojson }}, {{ user.verification.steps|tojson }})"
+                                class="px-3 py-1.5 text-xs bg-white/10 hover:bg-white/20 rounded-xl flex items-center gap-1.5">
+                            <i class="fa-solid fa-edit"></i>
+                            <span>Edit Steps</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Wallets for this user -->
+                <div id="wallets-{{ user['id'] }}" class="space-y-4">
+                    <div class="text-white/40 text-sm">Loading wallets...</div>
+                </div>
+
+                <div class="mt-4 text-xs text-white/40">
+                    Use the controls below each coin to change balance or toggle features. All changes save instantly.
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Admin Logs -->
+            <div class="mt-10">
+                <h3 class="text-xl font-semibold mb-4">Admin Activity Log (Last 50)</h3>
+                <div class="bg-black/60 rounded-3xl p-5 text-sm font-mono text-white/70 max-h-[420px] overflow-auto border border-white/10">
+                    {% for log in logs %}
+                    <div class="py-1.5 border-b border-white/10 last:border-0">
+                        {{ log['timestamp'][:19] }} | <span class="text-amber-400">{{ log['action'] }}</span> → User {{ log['target_user_id'] or 'N/A' }}
+                        <span class="text-white/40"> {{ log['details'][:80] if log['details'] else '' }}</span>
+                    </div>
+                    {% endfor %}
+                    {% if not logs %}
+                    <div class="text-white/40">No admin actions yet.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Verification Modal -->
+<div id="verification-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+    <div class="bg-zinc-900 border border-white/10 rounded-3xl w-full max-w-lg mx-4 overflow-hidden">
+        <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+            <div>
+                <div class="font-semibold text-lg" id="verif-modal-title">Manage Verification</div>
+                <div class="text-xs text-white/50" id="verif-modal-user"></div>
+            </div>
+            <button onclick="closeVerificationModal()" class="text-white/60 hover:text-white text-xl leading-none">&times;</button>
+        </div>
+
+        <div class="p-6 space-y-5">
+            <!-- Status Toggle -->
+            <div>
+                <div class="text-sm text-white/60 mb-2">Account Status</div>
+                <div class="flex gap-2">
+                    <button id="btn-verified"
+                            onclick="setModalStatus(true)"
+                            class="flex-1 py-2 rounded-2xl text-sm font-medium border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">
+                        ✓ Verified
+                    </button>
+                    <button id="btn-unverified"
+                            onclick="setModalStatus(false)"
+                            class="flex-1 py-2 rounded-2xl text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20">
+                        ⚠ Unverified
+                    </button>
+                </div>
+            </div>
+
+            <!-- Steps Section (only shown when unverified) -->
+            <div id="steps-section">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-sm text-white/60">Required Verification Steps</div>
+                    <button onclick="addVerificationStep()" 
+                            class="text-xs px-3 py-1 bg-white/10 hover:bg-white/20 rounded-xl">+ Add Step</button>
+                </div>
+                <div id="steps-list" class="space-y-2 max-h-64 overflow-auto pr-1"></div>
+                <div class="text-[10px] text-white/40 mt-1">These steps will be shown to the user when they try to verify.</div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-white/10 flex gap-3">
+            <button onclick="closeVerificationModal()" 
+                    class="flex-1 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-sm">Cancel</button>
+            <button onclick="saveVerificationFromModal()" 
+                    class="flex-1 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadUserDetails(userId) {
+    const container = document.getElementById('wallets-' + userId);
+    container.innerHTML = '<div class="text-white/40">Loading...</div>';
+    
+    try {
+        const res = await fetch('/api/admin/get_user_data/' + userId);
+        const data = await res.json();
+        
+        let html = '';
+        if (!data.wallets || data.wallets.length === 0) {
+            html = '<div class="text-white/40">No wallets for this user.</div>';
+        } else {
+            data.wallets.forEach(w => {
+                const wallet = w.wallet;
+                html += `
+                    <div class="bg-zinc-800 border border-white/10 rounded-2xl p-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <div>
+                                <span class="font-semibold">${wallet.name}</span>
+                                <span class="text-xs text-white/40 ml-2 font-mono">${wallet.address}</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="toggleFeature(${wallet.id}, 'send', this)" 
+                                        class="text-xs px-3 py-1 rounded-xl ${wallet.send_enabled ? 'bg-green-600' : 'bg-red-600'}">
+                                    Send: ${wallet.send_enabled ? 'ON' : 'OFF'}
+                                </button>
+                                <button onclick="toggleFeature(${wallet.id}, 'swap', this)" 
+                                        class="text-xs px-3 py-1 rounded-xl ${wallet.swap_enabled ? 'bg-green-600' : 'bg-red-600'}">
+                                    Swap: ${wallet.swap_enabled ? 'ON' : 'OFF'}
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Receive address management -->
+                        <div class="mt-1 mb-2 flex items-center gap-2 text-xs">
+                            <span class="text-white/40">Receive addr:</span>
+                            <span class="font-mono text-white/70 flex-1 truncate" title="${wallet.receive_address || ''}">${wallet.receive_address ? wallet.receive_address : 'Not set (receive not active)'}</span>
+                            <button onclick="setReceiveAddress(${userId}, '${(wallet.receive_address || '').replace(/'/g, "\\'")}')" 
+                                    class="px-2 py-0.5 bg-sky-600 hover:bg-sky-500 rounded text-[10px]">Edit</button>
+                        </div>
+
+                        <div class="text-xs uppercase text-white/40 mb-2">Holdings (Live Prices)</div>
+                        <div class="space-y-2">
+                `;
+
+                // Always show the 6 popular coins, even if amount is 0
+                const popularCoins = [
+                    {coin_id: 'bitcoin', symbol: 'BTC'},
+                    {coin_id: 'ethereum', symbol: 'ETH'},
+                    {coin_id: 'solana', symbol: 'SOL'},
+                    {coin_id: 'cardano', symbol: 'ADA'},
+                    {coin_id: 'ripple', symbol: 'XRP'},
+                    {coin_id: 'dogecoin', symbol: 'DOGE'}
+                ];
+
+                popularCoins.forEach(pc => {
+                    let h = (w.holdings || []).find(x => x.coin_id === pc.coin_id) || {id: null, amount: 0, coin_id: pc.coin_id, symbol: pc.symbol};
+                    const inputId = 'bal-' + (h.id || (userId + '-' + pc.coin_id));
+                    html += `
+                        <div class="flex items-center justify-between bg-black/40 rounded-xl px-3 py-2 text-sm">
+                            <div class="flex items-center gap-3">
+                                <div class="w-7 h-7 bg-emerald-500/80 rounded-lg flex items-center justify-center text-[10px] font-bold">${pc.symbol}</div>
+                                <div>${pc.symbol} <span class="text-white/40">(${pc.coin_id})</span></div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <input type="number" step="0.000001" value="${h.amount}" id="${inputId}"
+                                       class="w-28 bg-zinc-950 border border-white/20 rounded-lg px-2 py-1 text-right font-mono text-sm">
+                                <button onclick="saveBalance(${userId}, ${h.id || 'null'}, '${pc.coin_id}', this, '${inputId}')" 
+                                        class="px-3 py-1 bg-amber-500 hover:bg-amber-600 text-xs rounded-lg">Save</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += `</div></div>`;
+            });
+        }
+        container.innerHTML = html;
+    } catch(e) {
+        container.innerHTML = '<div class="text-red-400">Failed to load user data.</div>';
+    }
+}
+
+async function saveBalance(userId, holdingId, coinId, btn) {
+    const input = document.getElementById('bal-' + holdingId);
+    const amount = parseFloat(input.value);
+    if (isNaN(amount)) return alert('Invalid amount');
+    
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    
+    const res = await fetch('/api/admin/adjust_balance', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ user_id: userId, coin_id: coinId, amount: amount })
+    });
+    
+    const result = await res.json();
+    btn.textContent = 'Saved!';
+    setTimeout(() => {
+        btn.textContent = 'Save';
+        btn.disabled = false;
+        loadUserDetails(userId); // refresh
+    }, 800);
+}
+
+async function toggleFeature(walletId, feature, btn) {
+    const res = await fetch('/api/admin/toggle', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ wallet_id: walletId, feature: feature })
+    });
+    if (res.ok) {
+        // toggle visual
+        if (feature === 'send') {
+            btn.classList.toggle('bg-green-600');
+            btn.classList.toggle('bg-red-600');
+            btn.textContent = btn.textContent.includes('ON') ? 'Send: OFF' : 'Send: ON';
+        } else {
+            btn.classList.toggle('bg-green-600');
+            btn.classList.toggle('bg-red-600');
+            btn.textContent = btn.textContent.includes('ON') ? 'Swap: OFF' : 'Swap: ON';
+        }
+    }
+}
+
+async function setReceiveAddress(userId, currentAddr) {
+    const newAddr = prompt('Set / edit receive address for this user (leave empty to disable receive):', currentAddr || '');
+    if (newAddr === null) return; // cancelled
+
+    const res = await fetch('/api/admin/set_receive_address', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ user_id: userId, address: newAddr.trim() })
+    });
+    if (res.ok) {
+        alert('Receive address updated. User will see it immediately.');
+        loadUserDetails(userId);
+    } else {
+        alert('Failed to update receive address');
+    }
+}
+
+function viewCredentials(userId, email, name) {
+    const msg = `User: ${name}\nEmail: ${email}\nPassword Hash: [SHA256 - stored securely]\n\nNote: In real production we never show plain passwords. This is for demo/admin control only.`;
+    alert(msg);
+}
+
+// Auto-load data for all users when page loads
+function autoLoadAll() {
+    {% for user in users %}
+    setTimeout(() => loadUserDetails({{ user['id'] }}), 200);
+    {% endfor %}
+}
+window.onload = autoLoadAll;
+document.addEventListener('DOMContentLoaded', autoLoadAll);
+</script>
+
+<!-- Verification Modal -->
+<div id="verification-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+    <div class="bg-zinc-900 border border-white/10 rounded-3xl w-full max-w-lg mx-4 overflow-hidden">
+        <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+            <div>
+                <div class="font-semibold text-lg" id="verif-modal-title">Manage Verification</div>
+                <div class="text-xs text-white/50" id="verif-modal-user"></div>
+            </div>
+            <button onclick="closeVerificationModal()" class="text-white/60 hover:text-white text-xl leading-none">&times;</button>
+        </div>
+
+        <div class="p-6 space-y-5">
+            <!-- Status Toggle -->
+            <div>
+                <div class="text-sm text-white/60 mb-2">Account Status</div>
+                <div class="flex gap-2">
+                    <button id="btn-verified"
+                            onclick="setModalStatus(true)"
+                            class="flex-1 py-2 rounded-2xl text-sm font-medium border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">
+                        ✓ Verified
+                    </button>
+                    <button id="btn-unverified"
+                            onclick="setModalStatus(false)"
+                            class="flex-1 py-2 rounded-2xl text-sm font-medium border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20">
+                        ⚠ Unverified
+                    </button>
+                </div>
+            </div>
+
+            <!-- Steps Section (only shown when unverified) -->
+            <div id="steps-section">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="text-sm text-white/60">Required Verification Steps</div>
+                    <button onclick="addVerificationStep()" 
+                            class="text-xs px-3 py-1 bg-white/10 hover:bg-white/20 rounded-xl">+ Add Step</button>
+                </div>
+                <div id="steps-list" class="space-y-2 max-h-64 overflow-auto pr-1"></div>
+                <div class="text-[10px] text-white/40 mt-1">These steps will be shown to the user when they try to verify.</div>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-white/10 flex gap-3">
+            <button onclick="closeVerificationModal()" 
+                    class="flex-1 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-sm">Cancel</button>
+            <button onclick="saveVerificationFromModal()" 
+                    class="flex-1 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentVerifUserId = null;
+let currentVerifSteps = [];
+
+function openVerificationModal(userId, name, isVerified, steps) {
+    currentVerifUserId = userId;
+    currentVerifSteps = Array.isArray(steps) ? [...steps] : [];
+    
+    document.getElementById('verif-modal-title').textContent = 'Manage Verification';
+    document.getElementById('verif-modal-user').textContent = name + ' (ID: ' + userId + ')';
+    
+    // Set initial status buttons
+    setModalStatus(isVerified, false); // don't re-render steps yet
+    
+    // Render steps
+    renderVerificationSteps();
+    
+    document.getElementById('verification-modal').classList.remove('hidden');
+    document.getElementById('verification-modal').classList.add('flex');
+}
+
+function closeVerificationModal() {
+    const modal = document.getElementById('verification-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+function setModalStatus(isVerified, shouldRenderSteps = true) {
+    const btnV = document.getElementById('btn-verified');
+    const btnU = document.getElementById('btn-unverified');
+    const stepsSec = document.getElementById('steps-section');
+    
+    if (isVerified) {
+        btnV.classList.add('!bg-emerald-500', '!text-white', 'border-emerald-500');
+        btnV.classList.remove('bg-emerald-500/10', 'text-emerald-400');
+        btnU.classList.remove('!bg-red-500', '!text-white', 'border-red-500');
+        btnU.classList.add('bg-red-500/10', 'text-red-400');
+        stepsSec.style.display = 'none';
+    } else {
+        btnU.classList.add('!bg-red-500', '!text-white', 'border-red-500');
+        btnU.classList.remove('bg-red-500/10', 'text-red-400');
+        btnV.classList.remove('!bg-emerald-500', '!text-white', 'border-emerald-500');
+        btnV.classList.add('bg-emerald-500/10', 'text-emerald-400');
+        stepsSec.style.display = 'block';
+    }
+    
+    // store current choice on the modal
+    document.getElementById('verification-modal').dataset.isVerified = isVerified ? 'true' : 'false';
+    
+    if (shouldRenderSteps && !isVerified) {
+        renderVerificationSteps();
+    }
+}
+
+function renderVerificationSteps() {
+    const container = document.getElementById('steps-list');
+    container.innerHTML = '';
+    
+    if (currentVerifSteps.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'text-xs text-white/40 italic p-2 bg-black/30 rounded-xl';
+        empty.textContent = 'No steps yet. Add steps the user must complete.';
+        container.appendChild(empty);
+        return;
+    }
+    
+    currentVerifSteps.forEach((step, index) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-2 bg-black/40 rounded-xl px-3 py-2';
+        row.innerHTML = `
+            <div class="text-xs text-white/50 w-5 text-right">${index + 1}.</div>
+            <input type="text" value="${step.replace(/"/g, '&quot;')}" 
+                   class="flex-1 bg-transparent border border-white/10 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-white/30"
+                   onchange="updateStep(${index}, this.value)">
+            <button onclick="removeStep(${index})" 
+                    class="text-red-400 hover:text-red-300 px-2 text-lg leading-none">×</button>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function updateStep(index, value) {
+    currentVerifSteps[index] = value;
+}
+
+function addVerificationStep() {
+    currentVerifSteps.push('New verification step');
+    renderVerificationSteps();
+}
+
+function removeStep(index) {
+    currentVerifSteps.splice(index, 1);
+    renderVerificationSteps();
+}
+
+async function saveVerificationFromModal() {
+    if (!currentVerifUserId) return;
+    
+    const modal = document.getElementById('verification-modal');
+    const isVerified = modal.dataset.isVerified === 'true';
+    const stepsToSend = isVerified ? [] : currentVerifSteps;
+    
+    const btns = modal.querySelectorAll('button');
+    btns.forEach(b => b.disabled = true);
+    
+    try {
+        const res = await fetch('/api/admin/set_verification', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                user_id: currentVerifUserId,
+                is_verified: isVerified,
+                steps: stepsToSend
+            })
+        });
+        
+        if (res.ok) {
+            closeVerificationModal();
+            // Refresh the page so the status badges update
+            location.reload();
+        } else {
+            alert('Failed to save verification status');
+        }
+    } catch(e) {
+        alert('Error saving: ' + e.message);
+    } finally {
+        btns.forEach(b => b.disabled = false);
+    }
+}
+
+// Helper: when admin clicks "Unverified" we can auto-open with steps if wanted, but the button already opens it.
+</script>
+{% endblock %}

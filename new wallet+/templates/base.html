@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallet+</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        :root {
+            --primary: #00ff9d;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .trust-gradient {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .smooth-transition {
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="trust-gradient text-white min-h-screen">
+    {% block content %}{% endblock %}
+    
+    <!-- Global Loading Overlay -->
+    <div id="global-loader" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="w-16 h-16 border-4 border-[#00ff9d] border-t-transparent rounded-full loading-spinner mx-auto"></div>
+            <p class="mt-6 text-[#00ff9d] text-lg font-medium">Loading Wallet+...</p>
+        </div>
+    </div>
+    
+    <script>
+        function showLoading() {
+            const loader = document.getElementById('global-loader');
+            if (loader) loader.classList.remove('hidden');
+        }
+        
+        function hideLoading() {
+            const loader = document.getElementById('global-loader');
+            if (loader) loader.classList.add('hidden');
+        }
+        
+        // Hide loader as soon as page is ready
+        function forceHideLoader() {
+            setTimeout(() => {
+                const loader = document.getElementById('global-loader');
+                if (loader) loader.classList.add('hidden');
+            }, 300);
+        }
+        
+        window.addEventListener('load', forceHideLoader);
+        document.addEventListener('DOMContentLoaded', forceHideLoader);
+        
+        // Also hide on any click (safety net)
+        document.addEventListener('click', function(e) {
+            if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON') {
+                setTimeout(forceHideLoader, 1200);
+            }
+        }, true);
+    </script>
+</body>
+</html>

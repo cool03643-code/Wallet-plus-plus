@@ -1,0 +1,1097 @@
+{% extends "base.html" %}
+{% block content %}
+<script>
+  // Expose real connected wallet info to JS for real on-chain sends
+  window.WALLETPLUS = window.WALLETPLUS || {};
+  window.WALLETPLUS.externalAddress = {{ (external_address or '') | tojson }};
+  window.WALLETPLUS.hasExternalWallet = {{ 'true' if has_external_wallet else 'false' }};
+  window.WALLETPLUS.externalProvider = {{ (external_provider or '') | tojson }};
+</script>
+<div class="min-h-screen pb-20">
+    <!-- Top Header -->
+    <div class="bg-black/40 backdrop-blur-lg border-b border-white/10 sticky top-0 z-50">
+        <div class="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-emerald-500 rounded-2xl flex items-center justify-center">
+                    <i class="fa-solid fa-wallet"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">Wallet+</h1>
+                    <p class="text-xs text-emerald-400 -mt-1">Live • Secure</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <div class="text-right">
+                    <p class="text-sm text-emerald-400">Welcome,</p>
+                    <p class="font-semibold">{{ name }}</p>
+                </div>
+                <a href="{{ url_for('logout') }}" 
+                   class="text-white/60 hover:text-white smooth-transition">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if not verification.is_verified %}
+    <!-- Verification Warning Banner -->
+    <div class="max-w-5xl mx-auto px-6 pt-4">
+        <div class="bg-red-500/10 border border-red-500/30 rounded-3xl p-5 flex flex-col md:flex-row md:items-center gap-4">
+            <div class="flex-1">
+                <div class="flex items-center gap-3">
+                    <i class="fa-solid fa-exclamation-triangle text-red-400 text-xl"></i>
+                    <div>
+                        <div class="font-semibold text-red-400">Account needs verification</div>
+                        <div class="text-sm text-white/70">Your account is currently unverified. Complete the required steps to unlock full features.</div>
+                    </div>
+                </div>
+            </div>
+            <button onclick="openUserVerificationModal()"
+                    class="px-6 py-2.5 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-2xl text-sm flex items-center gap-2 whitespace-nowrap">
+                <i class="fa-solid fa-check-double"></i>
+                <span>Verify Account</span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- User Verification Modal -->
+    <div id="user-verif-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+        <div class="bg-zinc-900 border border-white/10 rounded-3xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/10">
+                <div class="font-semibold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-emerald-400"></i>
+                    <span>Account Verification</span>
+                </div>
+                <div class="text-xs text-white/50 mt-0.5">Complete the steps below to verify your account</div>
+            </div>
+
+            <div class="p-6">
+                <div id="user-verif-steps" class="space-y-3 mb-6"></div>
+                
+                <div id="verif-status-msg" class="hidden text-sm mb-4 p-3 rounded-2xl bg-emerald-500/10 text-emerald-400">
+                    Verification submitted. Admin will review shortly.
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-white/10 flex gap-3">
+                <button onclick="closeUserVerificationModal()" 
+                        class="flex-1 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-sm">Close</button>
+                <button onclick="submitUserVerification()" 
+                        id="btn-submit-verif"
+                        class="flex-1 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold">
+                    Submit for Review
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User verification modal logic -->
+    <script>
+        let userVerifSteps = [];
+
+        function openUserVerificationModal() {
+            const modal = document.getElementById('user-verif-modal');
+            const container = document.getElementById('user-verif-steps');
+            const statusMsg = document.getElementById('verif-status-msg');
+            const submitBtn = document.getElementById('btn-submit-verif');
+            
+            container.innerHTML = '';
+            statusMsg.classList.add('hidden');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit for Review';
+            
+// Fetch current user's verification steps (user-safe endpoint)
+    fetch('/api/user/my_verification')
+        .then(r => r.json())
+        .then(data => {
+            userVerifSteps = data.steps || [];
+            
+            if (userVerifSteps.length === 0) {
+                const p = document.createElement('div');
+                p.className = 'text-sm text-white/60 p-3 bg-black/30 rounded-2xl';
+                p.textContent = 'No specific steps required. Click submit to request verification.';
+                container.appendChild(p);
+                submitBtn.disabled = false;
+            } else {
+                userVerifSteps.forEach((step, i) => {
+                    const div = document.createElement('label');
+                    div.className = 'flex items-start gap-3 p-3 bg-black/40 rounded-2xl cursor-pointer hover:bg-black/60';
+                    div.innerHTML = `
+                        <input type="checkbox" class="mt-1 accent-emerald-500" data-step="${i}" onchange="checkAllStepsCompleted()">
+                        <span class="text-sm leading-snug">${step}</span>
+                    `;
+                    container.appendChild(div);
+                });
+                submitBtn.disabled = true; // must check all steps
+            }
+        })
+        .catch(() => {
+            const p = document.createElement('div');
+            p.className = 'text-sm text-red-400';
+            p.textContent = 'Could not load verification steps.';
+            container.appendChild(p);
+        });
+    
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+
+        function closeUserVerificationModal() {
+            const modal = document.getElementById('user-verif-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function submitUserVerification() {
+            const submitBtn = document.getElementById('btn-submit-verif');
+            const statusMsg = document.getElementById('verif-status-msg');
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            
+            try {
+                const res = await fetch('/api/user/submit_verification', { method: 'POST' });
+                if (res.ok) {
+                    statusMsg.classList.remove('hidden');
+                    submitBtn.textContent = 'Submitted';
+                    setTimeout(() => {
+                        closeUserVerificationModal();
+                        // Optionally show a toast
+                        showToast('Verification request sent to admin');
+                    }, 1200);
+                } else {
+                    alert('Failed to submit');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Submit for Review';
+                }
+            } catch(e) {
+                alert('Error: ' + e.message);
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit for Review';
+            }
+        }
+
+        function checkAllStepsCompleted() {
+            const container = document.getElementById('user-verif-steps');
+            const submitBtn = document.getElementById('btn-submit-verif');
+            if (!container || !submitBtn) return;
+            
+            const checkboxes = container.querySelectorAll('input[type="checkbox"]');
+            if (checkboxes.length === 0) {
+                submitBtn.disabled = false;
+                return;
+            }
+            
+            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+            submitBtn.disabled = !allChecked;
+        }
+    </script>
+
+    <!-- SEND MODAL -->
+    <div id="send-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+        <div class="bg-zinc-900 border border-white/10 rounded-3xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/10">
+                <div class="font-semibold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-up text-emerald-400"></i>
+                    <span>Send Crypto</span>
+                </div>
+                <div class="text-xs text-white/50">Choose coin and destination address</div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="text-xs text-white/60 block mb-1">Coin</label>
+                    <select id="send-coin" class="w-full bg-zinc-950 border border-white/20 rounded-2xl px-4 py-2.5 text-sm">
+                        {% for c in display_coins %}
+                        <option value="{{ c.coin_id }}">{{ c.symbol }} - {{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="text-xs text-white/60 block mb-1">Amount</label>
+                    <input id="send-amount" type="number" step="0.000001" placeholder="0.00" 
+                       class="w-full bg-zinc-950 border border-white/20 rounded-2xl px-4 py-2.5 text-sm font-mono">
+                </div>
+                <div>
+                    <label class="text-xs text-white/60 block mb-1">Destination Address</label>
+                    <input id="send-address" type="text" placeholder="0x... or wallet address" 
+                       class="w-full bg-zinc-950 border border-white/20 rounded-2xl px-4 py-2.5 text-sm font-mono">
+                </div>
+                <div id="send-result" class="hidden text-sm p-3 rounded-2xl bg-emerald-500/10 text-emerald-400"></div>
+                <div id="send-mode-hint" class="text-[10px] text-white/40 px-1"></div>
+            </div>
+            <div class="px-6 py-4 border-t border-white/10 flex gap-3">
+                <button onclick="closeSendModal()" class="flex-1 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-sm">Cancel</button>
+                <button onclick="submitSend()" class="flex-1 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-sm font-semibold">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SWAP MODAL -->
+    <div id="swap-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+        <div class="bg-zinc-900 border border-white/10 rounded-3xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/10">
+                <div class="font-semibold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-right-arrow-left text-purple-400"></i>
+                    <span>Swap Coins</span>
+                </div>
+                <div class="text-xs text-white/50">Exchange one coin for another at live rates</div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs text-white/60 block mb-1">From</label>
+                        <select id="swap-from" class="w-full bg-zinc-950 border border-white/20 rounded-2xl px-4 py-2.5 text-sm">
+                            {% for c in display_coins %}
+                            <option value="{{ c.coin_id }}">{{ c.symbol }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs text-white/60 block mb-1">To</label>
+                        <select id="swap-to" class="w-full bg-zinc-950 border border-white/20 rounded-2xl px-4 py-2.5 text-sm">
+                            {% for c in display_coins %}
+                            <option value="{{ c.coin_id }}">{{ c.symbol }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs text-white/60 block mb-1">Amount to swap (from)</label>
+                    <input id="swap-amount" type="number" step="0.000001" placeholder="0.00" 
+                       class="w-full bg-zinc-950 border border-white/20 rounded-2xl px-4 py-2.5 text-sm font-mono">
+                </div>
+                <div id="swap-result" class="hidden text-sm p-3 rounded-2xl bg-purple-500/10 text-purple-400"></div>
+            </div>
+            <div class="px-6 py-4 border-t border-white/10 flex gap-3">
+                <button onclick="closeSwapModal()" class="flex-1 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-sm">Cancel</button>
+                <button onclick="submitSwap()" class="flex-1 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-500 text-sm font-semibold">Swap</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- RECEIVE MODAL -->
+    <div id="receive-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
+        <div class="bg-zinc-900 border border-white/10 rounded-3xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/10">
+                <div class="font-semibold text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-arrow-down text-sky-400"></i>
+                    <span>Receive Address</span>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="text-xs text-white/60 mb-2">Your deposit address (share this)</div>
+                <div id="receive-address-box" 
+                     class="font-mono text-sm bg-black/60 border border-white/10 rounded-2xl p-4 break-all select-all cursor-pointer"
+                     onclick="copyReceiveAddress()"></div>
+                <div class="text-[10px] text-white/40 mt-2">Tap address to copy. Only send supported coins to this address.</div>
+                <div id="receive-status" class="mt-3 text-xs"></div>
+            </div>
+            <div class="px-6 py-4 border-t border-white/10">
+                <button onclick="closeReceiveModal()" class="w-full py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONNECT TO WALLET MODAL -->
+    <div id="connect-wallet-modal" class="hidden fixed inset-0 bg-black/70 flex items-center justify-center z-[110]">
+        <div class="bg-zinc-900 border border-white/10 rounded-3xl w-full max-w-md mx-4 overflow-hidden">
+            <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+                <div>
+                    <div class="font-semibold text-lg flex items-center gap-2">
+                        <i class="fa-solid fa-link text-emerald-400"></i>
+                        <span>Connect to Wallet</span>
+                    </div>
+                    <div class="text-xs text-emerald-400">Real scan only — looks for wallets actually installed on this browser or phone</div>
+                </div>
+                <button onclick="closeConnectWalletModal()" class="text-white/60 hover:text-white">✕</button>
+            </div>
+
+            <div class="p-6">
+                <div id="detected-wallets" class="mb-4"></div>
+
+                <div class="text-[10px] text-amber-400 mb-2">
+                    <b>Important:</b> This will <u>only</u> connect if a real wallet (Trust, MetaMask, Phantom, etc.) that is installed on your current device injects itself and returns its real address.
+                </div>
+
+                <div class="text-xs text-white/60 mb-1">Quick try buttons (still require a real wallet to respond):</div>
+                <div class="grid grid-cols-1 gap-2">
+                    <button onclick="connectWithProvider('trust', 'Trust Wallet')" 
+                            class="flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-sm">
+                        <i class="fa-solid fa-shield-halved w-5 text-emerald-400"></i>
+                        <span class="flex-1 text-left">Trust Wallet</span>
+                    </button>
+                    <button onclick="connectWithProvider('metamask', 'MetaMask')" 
+                            class="flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-sm">
+                        <i class="fa-brands fa-ethereum w-5 text-emerald-400"></i>
+                        <span class="flex-1 text-left">MetaMask</span>
+                    </button>
+                    <button onclick="connectWithProvider('phantom', 'Phantom')" 
+                            class="flex items-center gap-3 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl text-sm">
+                        <i class="fa-solid fa-ghost w-5 text-emerald-400"></i>
+                        <span class="flex-1 text-left">Phantom</span>
+                    </button>
+                </div>
+
+                <div class="mt-4 p-3 bg-black/40 rounded-2xl text-[10px] text-white/70">
+                    <b>How to connect a wallet from your phone:</b><br>
+                    1. On your phone, open Trust Wallet / MetaMask / Phantom.<br>
+                    2. Inside that app, go to its built-in Browser / dApp tab.<br>
+                    3. Paste the URL of this page into the wallet's browser.<br>
+                    4. Once loaded, tap "Connect to Wallet" — the wallet will be detected because it is loading the page.
+                </div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-white/10">
+                <button onclick="closeConnectWalletModal()" 
+                        class="w-full py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-sm">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="max-w-5xl mx-auto px-6 pt-8">
+        <!-- Balance Card -->
+        <div class="bg-gradient-to-br from-emerald-600 to-teal-600 rounded-3xl p-8 mb-8 card-hover smooth-transition">
+            <div class="flex justify-between items-start">
+                <div>
+                    <p class="text-emerald-100 text-sm">Total Portfolio Value</p>
+                    <h2 class="text-5xl font-bold mt-2" id="total-balance">${{ "{:,.2f}".format(total_usd) }}</h2>
+                    <p class="text-emerald-200 mt-1">Live from CoinGecko</p>
+                </div>
+                <div class="text-right">
+                    <div class="bg-black/30 px-4 py-1 rounded-2xl text-xs inline-flex items-center gap-2">
+                        <div class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        LIVE
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wallets -->
+        <div class="mb-8">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-semibold flex items-center gap-2"><i class="fa-solid fa-wallet"></i> Your Wallets</h3>
+                <button onclick="connectExternalWallet()" 
+                        class="text-sm px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl flex items-center gap-2">
+                    <i class="fa-solid fa-link"></i>
+                    <span>Connect to Wallet</span>
+                </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {% for w in wallets %}
+                <div class="bg-white/5 border border-white/10 rounded-3xl p-5">
+                    <div class="flex justify-between">
+                        <div>
+                            <div class="font-semibold">{{ w['name'] }}</div>
+                            <div class="text-xs text-white/50 font-mono">{{ w['address'] }}</div>
+                        </div>
+                        <div class="text-right text-xs">
+                            {% if w['send_enabled'] %} <span class="text-green-400">Send ON</span>{% else %}<span class="text-red-400">Send OFF</span>{% endif %}<br>
+                            {% if w['swap_enabled'] %} <span class="text-green-400">Swap ON</span>{% else %}<span class="text-red-400">Swap OFF</span>{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Connected External Wallet -->
+                {% if external_address %}
+                <div class="bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-5">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="font-semibold flex items-center gap-2">
+                                <i class="fa-solid fa-link text-emerald-400"></i>
+                                {{ external_provider or 'External Wallet' }}
+                            </div>
+                            <div class="text-xs text-white/50 font-mono mt-0.5">{{ external_address[:12] }}...{{ external_address[-6:] }}</div>
+                            <div class="text-[10px] text-emerald-400 mt-1">Synced • Balances shown below</div>
+                        </div>
+                        <button onclick="disconnectExternalWallet()" 
+                                class="text-xs px-3 py-1 bg-white/10 hover:bg-white/20 rounded-xl">Disconnect</button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-3 gap-4 mb-10">
+            {% if send_enabled %}
+            <a href="#" onclick="openSendModal()" 
+               class="bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl p-6 text-center smooth-transition active:scale-[0.985]">
+                <i class="fa-solid fa-arrow-up text-3xl mb-3 text-emerald-400"></i>
+                <p class="font-medium">Send</p>
+            </a>
+            {% else %}
+            <div onclick="showToast('Send not available')" 
+                 class="bg-white/5 border border-white/10 rounded-3xl p-6 text-center opacity-60 cursor-not-allowed">
+                <i class="fa-solid fa-arrow-up text-3xl mb-3 text-emerald-400/50"></i>
+                <p class="font-medium text-white/50">Send</p>
+                <p class="text-[10px] text-red-400 mt-1">Not available</p>
+            </div>
+            {% endif %}
+
+            {% if swap_enabled %}
+            <a href="#" onclick="openSwapModal()" 
+               class="bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl p-6 text-center smooth-transition active:scale-[0.985]">
+                <i class="fa-solid fa-arrow-right-arrow-left text-3xl mb-3 text-purple-400"></i>
+                <p class="font-medium">Swap</p>
+            </a>
+            {% else %}
+            <div onclick="showToast('Swap not available')" 
+                 class="bg-white/5 border border-white/10 rounded-3xl p-6 text-center opacity-60 cursor-not-allowed">
+                <i class="fa-solid fa-arrow-right-arrow-left text-3xl mb-3 text-purple-400/50"></i>
+                <p class="font-medium text-white/50">Swap</p>
+                <p class="text-[10px] text-red-400 mt-1">Not available</p>
+            </div>
+            {% endif %}
+
+            {% if receive_address %}
+            <a href="#" onclick="openReceiveModal()" 
+               class="bg-white/5 hover:bg-white/10 border border-white/10 rounded-3xl p-6 text-center smooth-transition active:scale-[0.985]">
+                <i class="fa-solid fa-arrow-down text-3xl mb-3 text-sky-400"></i>
+                <p class="font-medium">Receive</p>
+            </a>
+            {% else %}
+            <div onclick="showToast('Receive not active - ask admin to set address')" 
+                 class="bg-white/5 border border-white/10 rounded-3xl p-6 text-center opacity-60 cursor-not-allowed">
+                <i class="fa-solid fa-arrow-down text-3xl mb-3 text-sky-400/50"></i>
+                <p class="font-medium text-white/50">Receive</p>
+                <p class="text-[10px] text-red-400 mt-1">Not active</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+            <i class="fa-solid fa-coins"></i> Your Assets (Live Prices from CoinGecko)
+        </h3>
+        
+        <div class="space-y-3">
+            {% for coin in display_coins %}
+            <div class="bg-white/5 border border-white/10 rounded-3xl p-5 flex items-center justify-between card-hover smooth-transition">
+                <div class="flex items-center gap-4">
+                    <div class="w-11 h-11 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center text-white font-bold text-lg">
+                        {{ coin.symbol[:2] }}
+                    </div>
+                    <div>
+                        <div class="font-semibold flex items-center gap-2">
+                            {{ coin.symbol }} 
+                            <span class="text-xs text-white/50">({{ coin.name }})</span>
+                            {% if coin.from_external %}
+                            <span class="text-[9px] px-1.5 py-px bg-emerald-500/20 text-emerald-400 rounded">EXTERNAL</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-xs text-white/50">Price: ${{ "{:,.2f}".format(coin.price) }}</div>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="font-mono font-bold">{{ "%.6f"|format(coin.amount) }}</div>
+                    <div class="text-sm text-white/70">${{ "{:,.2f}".format(coin.value) }}</div>
+                    <div class="text-xs {{ 'text-green-400' if coin.change > 0 else 'text-red-400' }}">
+                        {{ "%.2f"|format(coin.change) }}%
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Bottom Navigation (Mobile) -->
+    <div class="fixed bottom-0 left-0 right-0 bg-black/90 border-t border-white/10 md:hidden">
+        <div class="max-w-5xl mx-auto flex justify-around py-3 text-xs">
+            <a href="#" class="flex flex-col items-center text-emerald-400">
+                <i class="fa-solid fa-house text-2xl mb-1"></i>
+                <span>Home</span>
+            </a>
+            <a href="#" class="flex flex-col items-center text-white/60">
+                <i class="fa-solid fa-chart-line text-2xl mb-1"></i>
+                <span>Markets</span>
+            </a>
+            <a href="#" onclick="window.location.reload()" class="flex flex-col items-center text-white/60">
+                <i class="fa-solid fa-wallet text-2xl mb-1"></i>
+                <span>Wallets</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="flex flex-col items-center text-white/60">
+                <i class="fa-solid fa-right-from-bracket text-2xl mb-1"></i>
+                <span>Exit</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+function showToast(msg) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 bg-zinc-800 text-white px-6 py-3 rounded-2xl shadow-2xl text-sm z-50';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+}
+
+// Global reference to the real connected wallet provider (set during Connect)
+window.WALLETPLUS = window.WALLETPLUS || {};
+window.WALLETPLUS.activeProvider = null;
+window.WALLETPLUS.externalAddress = window.WALLETPLUS.externalAddress || '';
+window.WALLETPLUS.hasExternalWallet = !!window.WALLETPLUS.hasExternalWallet;
+
+function getActiveEVMProvider() {
+    // Prefer the one captured during Connect
+    if (window.WALLETPLUS.activeProvider && typeof window.WALLETPLUS.activeProvider.request === 'function') {
+        return window.WALLETPLUS.activeProvider;
+    }
+    // Fallback to common injected
+    if (window.ethereum) {
+        if (Array.isArray(window.ethereum.providers)) {
+            return window.ethereum.providers[0] || window.ethereum;
+        }
+        return window.ethereum;
+    }
+    if (window.trustwallet) return window.trustwallet;
+    return null;
+}
+
+async function createNewWallet() {
+    const name = prompt("Name for the new wallet account:", "Savings Wallet");
+    if (!name) return;
+    
+    const res = await fetch('/api/admin/create_wallet', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ name: name })
+    });
+    if (res.ok) {
+        showToast('New wallet created with 0 balance!');
+        setTimeout(() => location.reload(), 800);
+    } else {
+        alert('Failed to create wallet');
+    }
+}
+
+// ===== SEND / SWAP / RECEIVE MODAL FUNCTIONS =====
+function openSendModal() {
+    const m = document.getElementById('send-modal');
+    if (!m) return;
+    m.classList.remove('hidden'); m.classList.add('flex');
+    const resBox = document.getElementById('send-result');
+    if (resBox) resBox.classList.add('hidden');
+
+    // Show helpful hint about real vs simulated
+    const hint = document.getElementById('send-mode-hint');
+    if (hint) {
+        const hasReal = window.WALLETPLUS && window.WALLETPLUS.hasExternalWallet && window.WALLETPLUS.externalAddress;
+        if (hasReal) {
+            hint.innerHTML = '✅ Real wallet connected — ETH sends will be <b>on-chain</b> (your wallet signs). Other coins = simulated.';
+            hint.className = 'text-[10px] text-emerald-400 px-1';
+        } else {
+            hint.innerHTML = 'Simulation mode (internal balance only). Connect a real wallet (MetaMask/Trust) for on-chain ETH sends.';
+            hint.className = 'text-[10px] text-white/40 px-1';
+        }
+    }
+}
+function closeSendModal() {
+    const m = document.getElementById('send-modal');
+    if (!m) return;
+    m.classList.add('hidden'); m.classList.remove('flex');
+}
+async function submitSend() {
+    const coin = document.getElementById('send-coin').value;
+    const amt = parseFloat(document.getElementById('send-amount').value);
+    const addr = document.getElementById('send-address').value.trim();
+    const resBox = document.getElementById('send-result');
+    resBox.classList.remove('hidden');
+    resBox.textContent = 'Processing...';
+
+    if (!coin || !amt || amt <= 0 || !addr) {
+        resBox.textContent = 'Please fill coin, amount and address';
+        resBox.className = 'text-sm p-3 rounded-2xl bg-red-500/10 text-red-400';
+        return;
+    }
+
+    const hasRealWallet = window.WALLETPLUS && window.WALLETPLUS.hasExternalWallet && window.WALLETPLUS.externalAddress;
+    const isETH = coin === 'ethereum';
+
+    // === REAL ON-CHAIN SEND (only for ETH + real connected EVM wallet) ===
+    if (isETH && hasRealWallet) {
+        try {
+            const provider = getActiveEVMProvider();
+            if (!provider || typeof provider.request !== 'function') {
+                throw new Error('No real wallet provider available. Re-connect your wallet.');
+            }
+
+            const from = window.WALLETPLUS.externalAddress;
+            const valueInWei = '0x' + (BigInt(Math.floor(amt * 1e18))).toString(16);
+
+            resBox.textContent = 'Requesting signature from your wallet...';
+
+            const txParams = {
+                from: from,
+                to: addr,
+                value: valueInWei,
+                // gas and gasPrice left to wallet to estimate (safer)
+            };
+
+            const txHash = await provider.request({
+                method: 'eth_sendTransaction',
+                params: [txParams]
+            });
+
+            if (!txHash) {
+                throw new Error('Wallet did not return a transaction hash.');
+            }
+
+            resBox.textContent = 'Broadcasting... tx: ' + txHash.slice(0, 10) + '...';
+
+            // Tell backend it was a real on-chain send so it can log + not require internal balance
+            const r = await fetch('/api/user/send', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    coin_id: coin,
+                    amount: amt,
+                    to_address: addr,
+                    real_onchain: true,
+                    tx_hash: txHash,
+                    from_address: from
+                })
+            });
+
+            let data = {};
+            const text = await r.text();
+            try { data = JSON.parse(text); } catch(_) { data = { status: 'error', message: 'Server returned invalid response' }; }
+
+            if (!r.ok || data.status === 'error') {
+                resBox.textContent = (data.message || 'HTTP ' + r.status) + ' — but tx was sent on-chain: ' + txHash;
+                resBox.className = 'text-sm p-3 rounded-2xl bg-amber-500/10 text-amber-400';
+                // Still show explorer link
+                setTimeout(() => {
+                    resBox.innerHTML = `TX sent on-chain: <a href="https://sepolia.etherscan.io/tx/${txHash}" target="_blank" class="underline">${txHash.slice(0,12)}...</a><br>Reload to see updated balance.`;
+                }, 800);
+                return;
+            }
+
+            resBox.className = 'text-sm p-3 rounded-2xl bg-emerald-500/10 text-emerald-400';
+            const explorer = data.explorer || `https://sepolia.etherscan.io/tx/${txHash}`;
+            resBox.innerHTML = `Real send submitted!<br><a href="${explorer}" target="_blank" class="underline text-emerald-300">View on Etherscan →</a>`;
+            setTimeout(() => { closeSendModal(); location.reload(); }, 2200);
+            return;
+
+        } catch (e) {
+            console.error('Real on-chain send failed:', e);
+            resBox.textContent = 'Wallet error: ' + (e.message || e);
+            resBox.className = 'text-sm p-3 rounded-2xl bg-red-500/10 text-red-400';
+            return;
+        }
+    }
+
+    // === FALLBACK: Simulated / internal send (original behavior) ===
+    try {
+        const r = await fetch('/api/user/send', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ coin_id: coin, amount: amt, to_address: addr })
+        });
+        let data = {};
+        const text = await r.text();
+        try { data = JSON.parse(text); } catch(_) { data = { status: 'error', message: 'Server returned invalid response' }; }
+        if (!r.ok || data.status === 'error') {
+            resBox.textContent = data.message || ('HTTP ' + r.status);
+            resBox.className = 'text-sm p-3 rounded-2xl bg-red-500/10 text-red-400';
+            console.error('Send failed', r.status, text);
+            return;
+        }
+        resBox.textContent = data.message;
+        resBox.className = 'text-sm p-3 rounded-2xl bg-emerald-500/10 text-emerald-400';
+        setTimeout(() => { closeSendModal(); location.reload(); }, 1400);
+    } catch(e) {
+        resBox.textContent = 'Error: ' + e.message;
+        resBox.className = 'text-sm p-3 rounded-2xl bg-red-500/10 text-red-400';
+        console.error(e);
+    }
+}
+
+function openSwapModal() {
+    const m = document.getElementById('swap-modal');
+    if (!m) return;
+    m.classList.remove('hidden'); m.classList.add('flex');
+    const resBox = document.getElementById('swap-result');
+    if (resBox) resBox.classList.add('hidden');
+}
+function closeSwapModal() {
+    const m = document.getElementById('swap-modal');
+    if (!m) return;
+    m.classList.add('hidden'); m.classList.remove('flex');
+}
+async function submitSwap() {
+    const from = document.getElementById('swap-from').value;
+    const to = document.getElementById('swap-to').value;
+    const amt = parseFloat(document.getElementById('swap-amount').value);
+    const resBox = document.getElementById('swap-result');
+    resBox.classList.remove('hidden');
+    resBox.textContent = 'Processing...';
+
+    if (!from || !to || from === to || !amt || amt <= 0) {
+        resBox.textContent = 'Choose different coins and enter amount';
+        resBox.className = 'text-sm p-3 rounded-2xl bg-red-500/10 text-red-400';
+        return;
+    }
+    try {
+        const r = await fetch('/api/user/swap', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ from_coin: from, to_coin: to, amount: amt })
+        });
+        let data = {};
+        const text = await r.text();
+        try { data = JSON.parse(text); } catch(_) { data = { status: 'error', message: 'Server returned invalid response' }; }
+        if (!r.ok || data.status === 'error') {
+            resBox.textContent = data.message || ('HTTP ' + r.status);
+            resBox.className = 'text-sm p-3 rounded-2xl bg-red-500/10 text-red-400';
+            console.error('Swap failed', r.status, text);
+            return;
+        }
+        resBox.textContent = data.message;
+        resBox.className = 'text-sm p-3 rounded-2xl bg-purple-500/10 text-purple-400';
+        setTimeout(() => { closeSwapModal(); location.reload(); }, 1400);
+    } catch(e) {
+        resBox.textContent = 'Error: ' + e.message;
+        resBox.className = 'text-sm p-3 rounded-2xl bg-red-500/10 text-red-400';
+        console.error(e);
+    }
+}
+
+let cachedReceiveAddress = '';
+async function openReceiveModal() {
+    const m = document.getElementById('receive-modal');
+    const box = document.getElementById('receive-address-box');
+    const status = document.getElementById('receive-status');
+    if (!m || !box) return;
+    m.classList.remove('hidden'); m.classList.add('flex');
+    box.textContent = 'Loading...';
+    status.textContent = '';
+    try {
+        const r = await fetch('/api/user/receive_address');
+        const data = await r.json();
+        cachedReceiveAddress = data.address || '';
+        if (data.active && cachedReceiveAddress) {
+            box.textContent = cachedReceiveAddress;
+            status.innerHTML = '<span class="text-emerald-400">Address active • Tap to copy</span>';
+        } else {
+            box.textContent = 'No receive address set';
+            status.innerHTML = '<span class="text-red-400">Receive not active. Ask admin to set your address.</span>';
+        }
+    } catch(e) {
+        box.textContent = 'Failed to load address';
+    }
+}
+function closeReceiveModal() {
+    const m = document.getElementById('receive-modal');
+    if (!m) return;
+    m.classList.add('hidden'); m.classList.remove('flex');
+}
+function copyReceiveAddress() {
+    if (!cachedReceiveAddress) return;
+    navigator.clipboard.writeText(cachedReceiveAddress).then(() => {
+        const s = document.getElementById('receive-status');
+        if (!s) return;
+        const old = s.innerHTML;
+        s.innerHTML = '<span class="text-emerald-400">Copied!</span>';
+        setTimeout(() => { s.innerHTML = old; }, 1200);
+    });
+}
+
+// ====================== CONNECT EXTERNAL WALLET (Trust, MetaMask, etc.) ======================
+let connectModalOpen = false;
+
+function connectExternalWallet() {
+    const modal = document.getElementById('connect-wallet-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    connectModalOpen = true;
+
+    const container = document.getElementById('detected-wallets');
+    if (container) {
+        container.innerHTML = '<div class="text-emerald-400 text-xs mb-2 animate-pulse">🔍 Scanning this browser and device for installed wallets...</div>';
+    }
+
+    // Immediate deep scan
+    detectInjectedWallets();
+
+    // Aggressively probe every known provider (this makes phone in-app browsers reveal themselves)
+    setTimeout(() => {
+        forceProbeRealWallets();
+    }, 200);
+
+    // One more pass in case some wallets are slow to inject
+    setTimeout(() => {
+        detectInjectedWallets();
+    }, 900);
+}
+
+// Aggressively probe for real installed wallets (desktop extensions + phone in-app browsers)
+async function forceProbeRealWallets() {
+    const container = document.getElementById('detected-wallets');
+    if (!container) return;
+
+    let foundSomething = false;
+
+    // Collect every possible provider object
+    const providers = [];
+    if (window.ethereum) {
+        if (Array.isArray(window.ethereum.providers)) {
+            providers.push(...window.ethereum.providers);
+        } else {
+            providers.push(window.ethereum);
+        }
+    }
+    if (window.trustwallet) providers.push(window.trustwallet);
+    if (window.phantom) providers.push(window.phantom);
+
+    for (const prov of providers) {
+        if (!prov || typeof prov.request !== 'function') continue;
+        try {
+            // Silent check first (many wallets will return already-connected accounts without popup)
+            const accounts = await prov.request({ method: 'eth_accounts' });
+            if (accounts && accounts.length > 0) {
+                foundSomething = true;
+            }
+        } catch (_) {}
+    }
+
+    // Solana
+    if (window.solana) {
+        try {
+            if (window.solana.isConnected || (window.solana.publicKey && window.solana.publicKey.toString)) {
+                foundSomething = true;
+            }
+        } catch (_) {}
+    }
+
+    // Refresh the list so the user sees what was actually found
+    setTimeout(() => {
+        detectInjectedWallets();
+    }, 350);
+
+    if (!foundSomething) {
+        setTimeout(detectInjectedWallets, 1100);
+    }
+}
+
+function closeConnectWalletModal() {
+    const modal = document.getElementById('connect-wallet-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    connectModalOpen = false;
+}
+
+function detectInjectedWallets() {
+    const container = document.getElementById('detected-wallets');
+    if (!container) return;
+    container.innerHTML = '<div class="text-xs text-white/50 mb-2">Scanning for wallets injected into this page...</div>';
+
+    // Give the page a tiny moment in case providers are loaded late
+    setTimeout(() => {
+        let detected = [];
+
+        // Support multiple injected providers (window.ethereum.providers array in some browsers)
+        let ethList = [];
+        if (window.ethereum) {
+            if (Array.isArray(window.ethereum.providers)) {
+                ethList = window.ethereum.providers;
+            } else {
+                ethList = [window.ethereum];
+            }
+        }
+
+        ethList.forEach((prov) => {
+            if (!prov) return;
+            // Only consider this a real injected wallet if it can actually make requests
+            const canRequest = typeof prov.request === 'function';
+            if (!canRequest) return;
+
+            let name = 'Browser Wallet';
+            let ptype = 'injected';
+            let icon = 'fa-solid fa-wallet';
+
+            if (prov.isMetaMask) { name = 'MetaMask'; ptype = 'metamask'; icon = 'fa-brands fa-ethereum'; }
+            else if (prov.isTrust || prov.isTrustWallet) { name = 'Trust Wallet'; ptype = 'trust'; icon = 'fa-solid fa-shield-halved'; }
+            else if (prov.isCoinbaseWallet) { name = 'Coinbase Wallet'; ptype = 'coinbase'; icon = 'fa-brands fa-ethereum'; }
+            else if (prov.isBraveWallet) { name = 'Brave Wallet'; ptype = 'brave'; icon = 'fa-solid fa-shield-halved'; }
+            else if (prov.isRainbow) { name = 'Rainbow'; ptype = 'rainbow'; icon = 'fa-solid fa-palette'; }
+            else if (prov.isZerion) { name = 'Zerion'; ptype = 'zerion'; icon = 'fa-solid fa-wallet'; }
+            else if (prov.isOKXWallet || prov.isOkxWallet) { name = 'OKX Wallet'; ptype = 'okx'; icon = 'fa-solid fa-wallet'; }
+            else if (prov.isBitgetWallet) { name = 'Bitget Wallet'; ptype = 'bitget'; icon = 'fa-solid fa-wallet'; }
+
+            if (!detected.find(d => d.name === name)) {
+                detected.push({ name, provider: ptype, icon, provRef: prov });
+            }
+        });
+
+        // Direct globals that some wallets expose (store the actual provider object for real calls)
+        if (window.trustwallet && !detected.find(d => d.name === 'Trust Wallet')) {
+            detected.push({ name: 'Trust Wallet', provider: 'trust', icon: 'fa-solid fa-shield-halved', provRef: window.trustwallet });
+        }
+        if (window.phantom && !detected.find(d => d.name === 'Phantom')) {
+            detected.push({ name: 'Phantom', provider: 'phantom', icon: 'fa-solid fa-ghost', provRef: window.phantom });
+        }
+        if (window.solana && window.solana.isPhantom && !detected.find(d => d.name === 'Phantom')) {
+            detected.push({ name: 'Phantom', provider: 'phantom', icon: 'fa-solid fa-ghost', provRef: window.solana });
+        }
+
+        container.innerHTML = '';
+
+        if (detected.length > 0) {
+            const el = document.createElement('div');
+            el.className = 'mb-3';
+            el.innerHTML = `<div class="text-xs text-emerald-400 mb-1">✅ Wallet(s) found on this device/browser — click to connect</div>`;
+            detected.forEach(d => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full flex items-center gap-3 px-4 py-2.5 mb-1 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 rounded-2xl text-sm active:scale-[0.985]';
+                btn.innerHTML = `<i class="${d.icon} w-5"></i><span class="flex-1 text-left font-medium">${d.name}</span><span class="text-[10px] px-2 py-0.5 bg-emerald-500/30 rounded">Connect</span>`;
+                btn.onclick = () => connectWithProvider(d.provider, d.name, d.provRef);
+                el.appendChild(btn);
+            });
+            container.appendChild(el);
+        } else {
+            const note = document.createElement('div');
+            note.className = 'text-xs text-white/70 mb-2 p-3 bg-zinc-950 border border-white/10 rounded-2xl';
+            note.innerHTML = `
+                <div class="font-semibold text-amber-400 mb-1">No real wallet injected into this page.</div>
+                <div class="leading-snug text-[11px]">
+                    This feature <b>only</b> detects wallets that are actually installed and currently injecting into the browser tab.<br><br>
+                    <b>Desktop:</b> Install Trust Wallet / MetaMask / Phantom extension, unlock it, then click Scan again.<br><br>
+                    <b>Phone:</b><br>
+                    1. Open Trust / MetaMask / Phantom app<br>
+                    2. Tap Browser / dApp / Discover inside the app<br>
+                    3. Paste or navigate to this exact page URL<br>
+                    4. Tap "Connect to Wallet" — the real wallet will appear because the wallet itself is loading the page.
+                </div>
+                <button onclick="detectInjectedWallets()" class="mt-2 text-[10px] px-2 py-0.5 bg-white/10 hover:bg-white/20 rounded">Scan again</button>
+            `;
+            container.appendChild(note);
+        }
+    }, 120);
+}
+
+async function connectWithProvider(provider, displayName, provRef = null) {
+    let address = '';
+    let usedRealProvider = false;
+
+    try {
+        // Prefer the exact provider reference captured during detection (most reliable)
+        let target = provRef;
+
+        if (provider === 'phantom') {
+            const sol = target || window.solana || window.phantom;
+            if (sol && typeof sol.connect === 'function') {
+                const resp = await sol.connect();
+                if (resp && resp.publicKey) {
+                    address = resp.publicKey.toString();
+                    usedRealProvider = true;
+                }
+            }
+        } else {
+            // EVM-style wallets (Trust, MetaMask, Coinbase, Brave, generic injected)
+            if (!target) {
+                // Try the most specific global first
+                if (provider === 'trust' && window.trustwallet) target = window.trustwallet;
+                else if (window.ethereum) {
+                    if (Array.isArray(window.ethereum.providers)) {
+                        // pick the one that matches best
+                        target = window.ethereum.providers.find(p => 
+                            (provider === 'trust' && (p.isTrust || p.isTrustWallet)) ||
+                            (provider === 'metamask' && p.isMetaMask) ||
+                            (provider === 'coinbase' && p.isCoinbaseWallet) ||
+                            (provider === 'brave' && p.isBraveWallet)
+                        ) || window.ethereum;
+                    } else {
+                        target = window.ethereum;
+                    }
+                }
+            }
+
+            if (target && typeof target.request === 'function') {
+                // This is the actual call into the real installed wallet
+                const accounts = await target.request({ method: 'eth_requestAccounts' });
+                if (accounts && accounts[0]) {
+                    address = accounts[0];
+                    usedRealProvider = true;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Real wallet did not respond:', e);
+    }
+
+    // === STRICT REAL-ONLY VALIDATION ===
+    // 1. Must have come from an actual provider request
+    // 2. Must be long enough (real addresses are)
+    // 3. Must look like a real address (0x... for EVM or reasonable base58 for Solana)
+    const looksLikeRealAddress = address && 
+        address.length >= 32 && 
+        (address.startsWith('0x') || /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address));
+
+    if (!address || !usedRealProvider || !looksLikeRealAddress) {
+        const container = document.getElementById('detected-wallets');
+        if (container) {
+            container.innerHTML = `
+                <div class="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-sm">
+                    <div class="font-semibold text-red-400 mb-1">No real wallet responded</div>
+                    <div class="text-white/80 text-xs">
+                        This page only connects <b>real wallets</b> that are installed on this browser or phone.<br><br>
+                        <b>Desktop:</b> Install &amp; unlock Trust Wallet, MetaMask, Phantom, etc. extension.<br>
+                        <b>Phone:</b> Open Trust/MetaMask/Phantom → use its in-app Browser → load this page → tap Connect.
+                    </div>
+                    <button onclick="detectInjectedWallets()" class="mt-3 text-xs px-3 py-1 bg-white/10 hover:bg-white/20 rounded-xl">Scan again</button>
+                </div>`;
+        }
+        return; // HARD STOP — never send fake, short, or invented addresses
+    }
+
+    // Send ONLY the real address returned by the actual wallet provider
+    const res = await fetch('/api/user/connect_external_wallet', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ provider: displayName, address: address })
+    });
+
+    if (res.ok) {
+        // Store the actual provider object so we can sign real transactions later
+        window.WALLETPLUS.activeProvider = target || provRef || (window.ethereum && (Array.isArray(window.ethereum.providers) ? window.ethereum.providers[0] : window.ethereum));
+        window.WALLETPLUS.externalAddress = address;
+        window.WALLETPLUS.hasExternalWallet = true;
+
+        closeConnectWalletModal();
+        showToast(displayName + ' connected (real wallet)');
+        setTimeout(() => location.reload(), 600);
+    } else {
+        const txt = await res.text().catch(() => '');
+        const container = document.getElementById('detected-wallets');
+        if (container) {
+            container.innerHTML = `<div class="p-3 bg-red-500/10 border border-red-500/30 rounded-2xl text-sm">Server rejected: ${txt || res.status}</div>`;
+        }
+    }
+}
+
+async function disconnectExternalWallet() {
+    // Simple: clear the external fields on the primary wallet
+    const res = await fetch('/api/user/connect_external_wallet', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ provider: '', address: '' })
+    });
+    if (res.ok) {
+        showToast('External wallet disconnected');
+        setTimeout(() => location.reload(), 400);
+    }
+}
+
+// The holdings are now rendered server-side with live prices
+window.onload = function() {
+    // Auto-refresh prices every 45 seconds
+    setInterval(() => {
+        location.reload();
+    }, 45000);
+};
+</script>
+{% endblock %}

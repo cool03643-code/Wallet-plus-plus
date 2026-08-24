@@ -1,0 +1,12 @@
+{
+  "name": "wallet-plus",
+  "version": "1.0.0",
+  "description": "Wallet+ - Trust Wallet inspired crypto wallet (Flask backend) - Cloudflare static fallback only",
+  "scripts": {
+    "build": "echo 'Static fallback prepared. Full Flask app cannot run on Cloudflare Pages. See DEPLOYMENT.md'",
+    "deploy:cloudflare": "npx wrangler pages deploy public --project-name=wallet-plus"
+  },
+  "keywords": ["wallet", "crypto", "flask"],
+  "author": "",
+  "license": "MIT"
+}

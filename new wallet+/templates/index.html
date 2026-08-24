@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="min-h-screen flex items-center justify-center p-6">
+    <div class="max-w-md w-full text-center">
+        <!-- Logo -->
+        <div class="flex justify-center mb-8">
+            <div class="w-24 h-24 bg-emerald-500 rounded-3xl flex items-center justify-center shadow-2xl">
+                <i class="fa-solid fa-wallet text-5xl text-white"></i>
+            </div>
+        </div>
+        
+        <h1 class="text-6xl font-bold mb-2 tracking-tighter">Wallet+</h1>
+        <p class="text-emerald-400 text-xl mb-12">Secure • Simple • Live</p>
+        
+        <div class="space-y-4">
+            <a href="{{ url_for('login') }}" 
+               onclick="showLoading()"
+               class="block w-full py-4 bg-emerald-500 hover:bg-emerald-600 rounded-2xl text-xl font-semibold smooth-transition">
+                Login
+            </a>
+            <a href="{{ url_for('register') }}" 
+               onclick="showLoading()"
+               class="block w-full py-4 border border-white/30 hover:bg-white/10 rounded-2xl text-xl font-semibold smooth-transition">
+                Create New Account
+            </a>
+        </div>
+        
+        <p class="text-xs text-white/40 mt-12">Trusted by thousands worldwide</p>
+    </div>
+</div>
+{% endblock %}

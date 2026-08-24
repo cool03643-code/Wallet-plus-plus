@@ -1,0 +1,93 @@
+HOW TO TURN YOUR COMPUTER INTO A PUBLIC SERVER FOR WALLET+
+
+Your Flask app is already running on port 5000.
+
+Current local addresses:
+- http://127.0.0.1:5000   (only this computer)
+- http://195.189.96.116:5000  (may or may not be reachable)
+
+To let ANYONE IN THE WORLD access it, you need a PUBLIC LINK.
+
+================================================================================
+OPTION 1: ngrok (Easiest, Recommended, Free)
+================================================================================
+
+1. Download ngrok (if you don't have it)
+   → Go to https://ngrok.com/download
+   → Download for Windows
+   → Unzip ngrok.exe to a folder, for example C:\ngrok
+
+2. Add ngrok to your PATH or just use the full path.
+
+3. Sign up for free at https://dashboard.ngrok.com/signup
+
+4. Get your authtoken:
+   https://dashboard.ngrok.com/get-started/your-authtoken
+
+5. Configure it (run once):
+   ngrok config add-authtoken 2xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+6. Start everything:
+
+   Open a terminal in this folder and run ONE of these:
+
+   A) Easy way (uses the helper we made):
+      python start_public.py
+
+   B) Manual way (more control):
+      - Terminal 1: python app.py
+      - Terminal 2: ngrok http 5000
+
+7. ngrok will show a link like:
+   https://abc123-xyz-1234.ngrok-free.app
+
+   Copy that link and send it to anyone. It works from anywhere.
+
+Keep the terminal open. When you close it, the link dies.
+
+================================================================================
+OPTION 2: Cloudflare Tunnel (Free, no credit card)
+================================================================================
+
+1. Download cloudflared:
+   https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe
+
+2. Rename the file to cloudflared.exe and put it in this folder.
+
+3. Run in terminal:
+   cloudflared.exe tunnel --url http://localhost:5000
+
+4. It will print a link like:
+   https://your-random-name.trycloudflare.com
+
+Share that.
+
+================================================================================
+SECURITY - DO THIS BEFORE SHARING THE LINK
+================================================================================
+
+1. Change the admin password:
+   - Open app.py
+   - Find the line with "admin123"
+   - Change it to a strong password
+   - Restart the server
+
+2. Change the secret key:
+   app.secret_key = 'put-a-long-random-string-here-1234567890'
+
+3. Only share the link with people you trust.
+
+================================================================================
+IMPORTANT NOTES
+================================================================================
+
+- Your computer must stay ON and connected to the internet.
+- The link only works while the scripts are running.
+- To stop: Close the terminal windows or press Ctrl+C.
+- This is your own computer acting as the server. It is not as reliable as
+  paid hosting (Railway, Render, etc.).
+- If you restart your router or computer, you may need to start the tunnel again.
+
+If you get any error, copy the full error message and send it to me.
+
+Good luck! Once you have the https:// link, anyone can open it.

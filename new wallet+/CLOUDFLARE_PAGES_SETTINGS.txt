@@ -1,0 +1,30 @@
+CLOUDFLARE PAGES - EXACT SETTINGS (after connecting GitHub repo)
+
+When you connect your GitHub "wallet-plus" repo to Cloudflare Pages:
+
+1. Go to Cloudflare Dashboard → Pages → Create a project → Connect to Git
+2. Select your wallet-plus repository
+3. In the build settings use these EXACT values:
+
+   Framework preset:           None
+   Build command:              npm run build
+   Build output directory:     public
+   Root directory:             /          (or leave empty)
+   Environment variables:      (none needed)
+
+4. Click "Save and Deploy"
+
+Result:
+- It will build using the files in the "public" folder.
+- You will get a URL like https://wallet-plus-xxx.pages.dev
+- The page will show a message that this is only the static part.
+- The real Flask app (with login, admin, database, Send/Swap) is NOT running on Cloudflare.
+
+This is expected. Cloudflare Pages cannot execute Python.
+
+For a working public version:
+- Use Render.com (recommended)
+- Or Railway
+- Or keep the localhost.run tunnel
+
+See DEPLOYMENT.md for the correct hosting options.

@@ -1,0 +1,6 @@
+flask
+requests
+gunicorn
+supabase
+python-dotenv
+web3>=6.0.0
